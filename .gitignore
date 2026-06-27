@@ -87,3 +87,9 @@ Thumbs.db
 # Test outputs
 test_outputs/
 test_results/
+
+# --- Keep current deliverables tracked (override the broad rules above) ---
+!notebooks/
+!notebooks/*.ipynb
+!data/
+!data/*.json

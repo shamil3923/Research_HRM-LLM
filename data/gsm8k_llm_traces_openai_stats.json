@@ -1,0 +1,16 @@
+{
+  "model": "gpt-4o-mini",
+  "reject_reasons": {
+    "exec_mismatch": 1768,
+    "bad_arg": 680,
+    "inexact_div": 547,
+    "bad_op": 28,
+    "json_parse": 4,
+    "no_result": 3,
+    "final_missing": 2
+  },
+  "train": {
+    "kept": 4441
+  },
+  "mean_grounding": 0.7612848924163795
+}
