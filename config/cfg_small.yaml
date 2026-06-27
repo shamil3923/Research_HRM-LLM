@@ -1,0 +1,45 @@
+# Small HRM Configuration for Testing
+# Reduced model size for faster iteration
+
+# Core hyperparameters
+learning_rate: 0.0001
+embedding_lr: 0.00007
+weight_decay: 0.1
+embedding_weight_decay: 0.1
+batch_size: 16
+max_epochs: 10
+
+# Learning rate scheduling
+warmup_steps: 50
+min_lr_ratio: 0.1
+
+# AdamATan2 parameters
+beta1: 0.9
+beta2: 0.95
+
+# Model architecture (smaller for testing)
+d_model: 256
+H_cycles: 1
+L_cycles: 1
+H_layers: 2
+L_layers: 2
+expansion: 2.0
+
+# ACT and Q-learning
+halt_max_steps: 4
+halt_exploration_prob: 0.1
+
+# Data (smaller datasets)
+train_samples: 50
+val_samples: 10
+min_difficulty: 20
+data_path: "data"
+
+# Training
+eval_interval: 100
+save_every: 100
+checkpoint_dir: "checkpoints"
+
+# Monitoring
+project_name: "hrm-mlx-small"
+run_name: "test-run"

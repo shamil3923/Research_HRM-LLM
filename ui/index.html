@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRM Pipeline Visualizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2235;
+            --bg-card-hover: #1f2a40;
+            --border: #2a3550;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.15);
+            --green: #22c55e;
+            --green-bg: rgba(34, 197, 94, 0.12);
+            --red: #ef4444;
+            --red-bg: rgba(239, 68, 68, 0.12);
+            --yellow: #f59e0b;
+            --yellow-bg: rgba(245, 158, 11, 0.12);
+            --cyan: #06b6d4;
+            --purple: #a855f7;
+            --pink: #ec4899;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+            border-bottom: 1px solid var(--border);
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+        }
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-stats {
+            display: flex;
+            gap: 24px;
+        }
+        .stat-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+        .stat-badge .val {
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Layout */
+        .container {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: calc(100vh - 72px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 16px;
+            overflow-y: auto;
+            max-height: calc(100vh - 72px);
+        }
+        .sidebar h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .sample-btn {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.85rem;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            transition: all 0.15s;
+            margin-bottom: 4px;
+        }
+        .sample-btn:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+        .sample-btn.active {
+            background: var(--accent-glow);
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+        .sample-btn .tag {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .tag-correct { background: var(--green-bg); color: var(--green); }
+        .tag-wrong { background: var(--red-bg); color: var(--red); }
+        .tag-near { background: var(--yellow-bg); color: var(--yellow); }
+
+        /* Main content */
+        .main {
+            padding: 24px 32px;
+            overflow-y: auto;
+            max-height: calc(100vh - 72px);
+        }
+
+        /* Pipeline flow */
+        .pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .pipeline-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+        .pipeline-step:hover {
+            border-color: var(--accent);
+        }
+        .step-header {
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+        .step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .step-1 .step-num { background: linear-gradient(135deg, #6366f1, #818cf8); }
+        .step-2 .step-num { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+        .step-3 .step-num { background: linear-gradient(135deg, #a855f7, #c084fc); }
+        .step-4 .step-num { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #000; }
+        .step-5 .step-num { background: linear-gradient(135deg, #22c55e, #4ade80); color: #000; }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .step-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .step-body {
+            padding: 16px 20px;
+        }
+
+        /* Graph viz */
+        .graph-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .graph-node {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            min-width: 120px;
+            transition: transform 0.2s;
+        }
+        .graph-node:hover { transform: translateY(-2px); }
+        .graph-node.node-correct { border-color: var(--green); }
+        .graph-node.node-wrong { border-color: var(--red); }
+        .node-op {
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--cyan);
+            margin-bottom: 4px;
+        }
+        .node-vals {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .node-pred {
+            margin-top: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        /* H/L States */
+        .states-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .state-col h4 {
+            font-size: 0.8rem;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .state-bar-container {
+            margin-bottom: 6px;
+        }
+        .state-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .state-bar {
+            height: 20px;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .h-bar { background: linear-gradient(90deg, var(--accent), var(--purple)); }
+        .l-bar { background: linear-gradient(90deg, var(--cyan), var(--green)); }
+
+        /* Digit probs */
+        .digit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .digit-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .digit-card.digit-correct { border-color: var(--green); }
+        .digit-card.digit-wrong { border-color: var(--red); }
+        .digit-pos {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+        .digit-pred {
+            font-size: 1.6rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 8px;
+        }
+        .prob-bar-wrap {
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .prob-label {
+            width: 28px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+        }
+        .prob-bar-bg {
+            flex: 1;
+            height: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .prob-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+        .prob-val {
+            width: 36px;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Result card */
+        .result-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 32px;
+            padding: 24px;
+            text-align: center;
+        }
+        .result-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .result-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .result-arrow {
+            font-size: 2rem;
+            color: var(--text-muted);
+        }
+        .result-correct .result-number { color: var(--green); }
+        .result-wrong .result-number { color: var(--red); }
+
+        /* ACT */
+        .act-info {
+            display: flex;
+            gap: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+        .act-val { font-weight: 600; }
+
+        /* Arrow connectors */
+        .pipeline-arrow {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            margin: -8px 0;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 60vh;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+        .loading-spinner {
+            width: 24px; height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* Live inference */
+        .live-section { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+        .live-section h3 { margin-bottom: 10px; }
+        .live-textarea {
+            width: 100%; min-height: 80px; padding: 10px; border-radius: 8px;
+            border: 1px solid var(--border); background: var(--bg-card); color: var(--text-primary);
+            font-family: 'Inter', sans-serif; font-size: 0.82rem; resize: vertical;
+        }
+        .live-textarea:focus { outline: none; border-color: var(--accent); }
+        .live-btn {
+            width: 100%; margin-top: 8px; padding: 10px; border: none; border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--purple)); color: #fff;
+            font-weight: 600; font-size: 0.85rem; cursor: pointer; font-family: 'Inter', sans-serif;
+            transition: opacity 0.2s;
+        }
+        .live-btn:hover { opacity: 0.9; }
+        .live-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .live-status { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; text-align: center; }
+        .live-explanation {
+            background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
+            padding: 14px 18px; font-size: 0.85rem; line-height: 1.6; color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .live-explanation strong { color: var(--cyan); }
+
+        /* Training Run Summary panel */
+        .training-panel {
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+        .tp-toggle-btn {
+            background: var(--accent-glow);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .tp-toggle-btn:hover { background: var(--accent); color: white; }
+        .tp-trace {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 4px;
+        }
+        .tp-trace-row {
+            padding: 4px 0;
+            border-bottom: 1px dashed var(--border);
+            display: grid;
+            grid-template-columns: 50px 1fr 90px;
+            gap: 10px;
+            align-items: center;
+        }
+        .tp-trace-row:last-child { border-bottom: none; }
+        .tp-trace-row .label { color: var(--text-muted); }
+        .tp-trace-row .expr  { color: var(--text-primary); }
+        .tp-trace-row .val   { color: var(--cyan); text-align: right; font-weight: 600; }
+        .tp-warn {
+            background: var(--yellow-bg);
+            border: 1px solid var(--yellow);
+            color: var(--yellow);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-top: 8px;
+        }
+        .training-panel h2 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .training-panel .tp-sub {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-bottom: 16px;
+        }
+        .tp-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .tp-metric {
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .tp-metric .lbl {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .tp-metric .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 2px;
+        }
+        .tp-metric .val.green   { color: var(--green); }
+        .tp-metric .val.cyan    { color: var(--cyan); }
+        .tp-metric .val.purple  { color: var(--purple); }
+        .tp-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin: 14px 0 8px;
+        }
+        table.tp-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        table.tp-table th, table.tp-table td {
+            text-align: right;
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        table.tp-table th:first-child, table.tp-table td:first-child {
+            text-align: left;
+            color: var(--text-secondary);
+        }
+        table.tp-table tbody tr:hover { background: var(--bg-card-hover); }
+        .tp-bar-row {
+            display: grid;
+            grid-template-columns: 28px 1fr 44px;
+            gap: 10px;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+        .tp-bar-bg {
+            background: var(--bg-card-hover);
+            border-radius: 4px;
+            overflow: hidden;
+            height: 14px;
+        }
+        .tp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--cyan));
+            border-radius: 4px;
+        }
+        .tp-spark {
+            display: block;
+            width: 100%;
+            height: 60px;
+            background: var(--bg-card-hover);
+            border-radius: 6px;
+            padding: 6px;
+        }
+        details.tp-details { margin-top: 12px; }
+        details.tp-details > summary {
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            padding: 6px 0;
+        }
+        details.tp-details > summary:hover { color: var(--text-primary); }
+        .tp-sample {
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 6px 0;
+            font-size: 0.85rem;
+        }
+        .tp-sample-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .tp-coh-pill {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .tp-coh-1 { background: var(--red-bg); color: var(--red); }
+        .tp-coh-2 { background: var(--red-bg); color: var(--red); }
+        .tp-coh-3 { background: var(--yellow-bg); color: var(--yellow); }
+        .tp-coh-4 { background: var(--green-bg); color: var(--green); }
+        .tp-coh-5 { background: var(--green-bg); color: var(--green); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🧠 HRM-MLX Pipeline Visualizer</h1>
+    <div class="header-stats" id="headerStats"></div>
+</div>
+
+<div class="container">
+    <div class="sidebar" id="sidebar">
+        <div class="live-section">
+            <h3>🔴 Live Inference</h3>
+            <textarea class="live-textarea" id="liveInput" placeholder="Type a math word problem...&#10;&#10;e.g. John has 5 apples. He buys 3 more bags with 4 apples each. How many apples does he have?"></textarea>
+            <button class="live-btn" id="liveBtn" onclick="runLiveInference()">⚡ Run HRM Pipeline</button>
+            <div class="live-status" id="liveStatus"></div>
+        </div>
+        <h3>Cached Samples</h3>
+        <div id="sampleList"></div>
+    </div>
+    <div class="main" id="mainContent">
+        <div class="loading">
+            <div class="loading-spinner"></div>
+            Loading predictions...
+        </div>
+    </div>
+</div>
+
+<script>
+let DATA = null;
+let TRAINING_STATS = null;
+let currentSample = 0;
+let SHOW_TRAINING = false;          // training-summary panel hidden by default
+
+function toggleTraining() {
+    SHOW_TRAINING = !SHOW_TRAINING;
+    renderHeader();   // flip the button label
+    if (TRAINING_STATS && Array.isArray(TRAINING_STATS.explanation_samples)
+        && TRAINING_STATS.explanation_samples.length) {
+        selectV32Sample(currentSample);
+    } else if (DATA) {
+        selectSample(currentSample);
+    }
+}
+
+async function loadData() {
+    try {
+        const [resp, statsResp] = await Promise.all([
+            fetch('predictions.json?t=' + new Date().getTime()),
+            fetch('training_stats.json?t=' + new Date().getTime()).catch(() => null),
+        ]);
+        DATA = await resp.json();
+        if (statsResp && statsResp.ok) {
+            try { TRAINING_STATS = await statsResp.json(); } catch (_) { TRAINING_STATS = null; }
+        }
+        renderSidebar();
+        renderHeader();
+    } catch (e) {
+        document.getElementById('mainContent').innerHTML = `
+            <div class="loading" style="flex-direction:column;gap:12px">
+                <div style="font-size:1.5rem">⚠️</div>
+                <div>Could not load predictions.json</div>
+                <div style="font-size:0.85rem;color:var(--text-muted)">
+                    Run: <code style="color:var(--cyan)">python src/export_predictions.py</code> first
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(e.message || String(e))}</div>
+            </div>
+        `;
+        return;
+    }
+    // Render the first sample OUTSIDE the load try/catch so a renderer
+    // exception doesn't get mis-labelled as a load failure.
+    try {
+        const v32 = TRAINING_STATS && Array.isArray(TRAINING_STATS.explanation_samples)
+            && TRAINING_STATS.explanation_samples.length;
+        if (v32) {
+            selectV32Sample(0);
+        } else {
+            selectSample(0);
+        }
+    } catch (e) {
+        console.error('render error', e);
+        document.getElementById('mainContent').innerHTML = `
+            <div class="training-panel">
+                ${renderTrainingPanel()}
+                <div style="margin-top:14px;padding:10px 14px;background:var(--red-bg);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:0.85rem">
+                    Render error on first sample: ${escapeHtml(e.message || String(e))}
+                </div>
+            </div>
+        `;
+    }
+}
+
+function fmtPct(x) { return (x * 100).toFixed(2) + '%'; }
+
+function renderHeader() {
+    const s = DATA;
+    const correct = s.samples.filter(x => x.correct).length;
+    const t = TRAINING_STATS;
+    if (t) {
+        // Prefer real training-run metrics when available.
+        const valColor = t.best.val_exact_acc > 0.30 ? 'var(--green)' : 'var(--yellow)';
+        const testColor = t.test.exact_acc > 0.30 ? 'var(--green)' : 'var(--yellow)';
+        document.getElementById('headerStats').innerHTML = `
+            <div class="stat-badge">Model: <span class="val">${t.model.name}</span></div>
+            <div class="stat-badge">Params: <span class="val">${t.model.params}</span></div>
+            <div class="stat-badge">Val Ex: <span class="val" style="color:${valColor}">${fmtPct(t.best.val_exact_acc)}</span></div>
+            <div class="stat-badge">Test Ex: <span class="val" style="color:${testColor}">${fmtPct(t.test.exact_acc)}</span></div>
+            <div class="stat-badge">Coherence: <span class="val" style="color:var(--cyan)">${(t.interpretability.mean_coherence ?? 0).toFixed(2)} / 5</span></div>
+            <button class="tp-toggle-btn" onclick="toggleTraining()">${SHOW_TRAINING ? 'Hide' : 'Show'} Training Summary</button>
+        `;
+    } else {
+        document.getElementById('headerStats').innerHTML = `
+            <div class="stat-badge">Samples: <span class="val">${s.total}</span></div>
+            <div class="stat-badge">Accuracy: <span class="val" style="color:${s.accuracy > 0.3 ? 'var(--green)' : 'var(--yellow)'}">${(s.accuracy * 100).toFixed(1)}%</span></div>
+            <div class="stat-badge">Correct: <span class="val" style="color:var(--green)">${correct}</span> / ${s.total}</div>
+            <div class="stat-badge">Model: <span class="val">${s.model_params}</span></div>
+        `;
+    }
+}
+
+function renderTrainingPanel() {
+    const t = TRAINING_STATS;
+    if (!t) return '';
+    if (!SHOW_TRAINING) return '';
+
+    // Magnitude bucket table
+    const bucketRows = t.test.by_bucket.map(b => `
+        <tr>
+            <td>${b.bucket}</td>
+            <td>${b.n}</td>
+            <td style="color:${b.exact > 0.5 ? 'var(--green)' : b.exact > 0.2 ? 'var(--yellow)' : 'var(--red)'}">${fmtPct(b.exact)}</td>
+            <td>${fmtPct(b.near)}</td>
+        </tr>
+    `).join('');
+
+    // Coherence histogram
+    const cohDist = t.interpretability.distribution || {};
+    const cohN = Math.max(1, Object.values(cohDist).reduce((a, b) => a + b, 0));
+    const cohRows = [1, 2, 3, 4, 5].map(score => {
+        const c = cohDist[score] || 0;
+        const pct = (c / cohN) * 100;
+        return `<div class="tp-bar-row">
+            <span class="tp-coh-pill tp-coh-${score}">${score}</span>
+            <div class="tp-bar-bg"><div class="tp-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>
+            <span style="color:var(--text-muted);text-align:right">${c}</span>
+        </div>`;
+    }).join('');
+
+    // Sparkline: val exact-match over epochs
+    const spark = t.training.spark_exact || [];
+    let sparkSVG = '';
+    if (spark.length > 1) {
+        const W = 600, H = 60;
+        const xs = spark.map(p => p.epoch);
+        const ys = spark.map(p => p.v || 0);
+        const xMin = Math.min(...xs), xMax = Math.max(...xs);
+        const yMin = 0, yMax = Math.max(0.01, Math.max(...ys));
+        const pts = spark.map(p => {
+            const x = ((p.epoch - xMin) / Math.max(1, xMax - xMin)) * (W - 8) + 4;
+            const y = H - 4 - ((p.v - yMin) / (yMax - yMin)) * (H - 8);
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        sparkSVG = `<svg class="tp-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+            <polyline points="${pts}" fill="none" stroke="url(#sparkGrad)" stroke-width="2"/>
+            <defs><linearGradient id="sparkGrad" x1="0" x2="1">
+              <stop offset="0%"  stop-color="var(--accent)"/>
+              <stop offset="100%" stop-color="var(--cyan)"/>
+            </linearGradient></defs>
+        </svg>`;
+    }
+
+    // Sample explanations preview
+    const samples = (t.explanation_samples || []).slice(0, 8).map(s => `
+        <div class="tp-sample">
+            <div class="tp-sample-head">
+                <span>#${s.i + 1} • true=${s.true}  hrm=${s.hrm_pred}</span>
+                <span class="tp-coh-pill tp-coh-${s.coherence ?? 1}">coh ${s.coherence ?? '–'}</span>
+            </div>
+            <div style="color:var(--text-secondary);font-size:0.8rem">${escapeHtml(s.question || '')}</div>
+            <div style="margin-top:6px;color:var(--text-muted);font-size:0.78rem">${escapeHtml(s.explanation_preview || '')}</div>
+        </div>
+    `).join('');
+
+    return `
+    <div class="training-panel">
+        <h2>📈 Training Run Summary</h2>
+        <div class="tp-sub">${t.model.name} • ${t.model.params} params • ${t.model.architecture} • ${t.model.optimizer} • ${t.model.epochs_trained} epochs</div>
+
+        <div class="tp-section-title">Best Checkpoint (Validation, n=1171)</div>
+        <div class="tp-grid">
+            <div class="tp-metric"><div class="lbl">Epoch</div><div class="val">${t.best.epoch}</div></div>
+            <div class="tp-metric"><div class="lbl">Val Exact</div><div class="val green">${fmtPct(t.best.val_exact_acc)}</div></div>
+            <div class="tp-metric"><div class="lbl">Val Near (±1)</div><div class="val">${fmtPct(t.best.val_near_acc)}</div></div>
+            <div class="tp-metric"><div class="lbl">Val Digit</div><div class="val cyan">${fmtPct(t.best.val_digit_acc)}</div></div>
+            <div class="tp-metric"><div class="lbl">Avg Halt (of 4)</div><div class="val purple">${(t.best.mean_halt_steps || 0).toFixed(2)}</div></div>
+            <div class="tp-metric"><div class="lbl">No-Output</div><div class="val">${t.best.no_output}</div></div>
+        </div>
+
+        <div class="tp-section-title">GSM8K Test Set (n=${t.test.n})</div>
+        <div class="tp-grid">
+            <div class="tp-metric"><div class="lbl">Test Exact</div><div class="val green">${fmtPct(t.test.exact_acc)}</div></div>
+            <div class="tp-metric"><div class="lbl">Test Near (±1)</div><div class="val">${fmtPct(t.test.near_acc)}</div></div>
+            <div class="tp-metric"><div class="lbl">Test Digit</div><div class="val cyan">${fmtPct(t.test.digit_acc)}</div></div>
+            <div class="tp-metric"><div class="lbl">Avg Halt</div><div class="val purple">${(t.test.mean_halt_steps || 0).toFixed(2)}</div></div>
+            <div class="tp-metric"><div class="lbl">No-Output</div><div class="val">${t.test.no_output}</div></div>
+            <div class="tp-metric"><div class="lbl">Errors Logged</div><div class="val">${t.test.n_errors}</div></div>
+        </div>
+
+        <div class="tp-section-title">Accuracy by Answer Magnitude</div>
+        <table class="tp-table">
+            <thead>
+                <tr><th>Bucket</th><th>n</th><th>Exact</th><th>Near</th></tr>
+            </thead>
+            <tbody>${bucketRows}</tbody>
+        </table>
+
+        <div class="tp-section-title" style="margin-top:18px">Validation Exact-Match over Training</div>
+        ${sparkSVG}
+
+        <div class="tp-section-title" style="margin-top:18px">Interpretability — Coherence Distribution (n=${t.interpretability.n_explanations}, mean ${(t.interpretability.mean_coherence ?? 0).toFixed(2)})</div>
+        ${cohRows}
+
+        <details class="tp-details">
+            <summary>Sample explanations + coherence scores (first 8)</summary>
+            <div style="margin-top:8px">${samples}</div>
+        </details>
+    </div>`;
+}
+
+function escapeHtml(s) {
+    return (s || '').toString()
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderSidebar() {
+    const list = document.getElementById('sampleList');
+    // Prefer the 20 real v3.2 explanation samples when available.
+    const v32 = TRAINING_STATS && Array.isArray(TRAINING_STATS.explanation_samples)
+        ? TRAINING_STATS.explanation_samples : null;
+
+    if (v32 && v32.length) {
+        // Mode A — v3.2 samples (the new, correct, current run).
+        list.innerHTML = v32.map((s, i) => {
+            const correct = s.true === s.hrm_pred;
+            const tagClass = correct ? 'tag-correct' : 'tag-wrong';
+            const tagText  = correct ? '✓' : '✗';
+            return `<button class="sample-btn" id="btn-${i}" onclick="selectV32Sample(${i})">
+                <span>#${i + 1} → true ${s.true} / hrm ${s.hrm_pred}</span>
+                <span class="tag ${tagClass}">${tagText}</span>
+            </button>`;
+        }).join('');
+    } else {
+        // Mode B — fall back to the old predictions.json samples.
+        list.innerHTML = DATA.samples.map((s, i) => {
+            const tagClass = s.correct ? 'tag-correct' : (s.near_match ? 'tag-near' : 'tag-wrong');
+            const tagText  = s.correct ? '✓' : (s.near_match ? '±1' : '✗');
+            return `<button class="sample-btn" id="btn-${i}" onclick="selectSample(${i})">
+                <span>#${i + 1} → ${s.computed_answer}</span>
+                <span class="tag ${tagClass}">${tagText}</span>
+            </button>`;
+        }).join('');
+    }
+}
+
+function selectSample(idx) {
+    // Used for the OLD predictions.json fallback (Mode B).
+    currentSample = idx;
+    document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${idx}`)?.classList.add('active');
+    renderPipeline(DATA.samples[idx]);
+}
+
+function renderSymbolicTrace(trace) {
+    const steps = (trace && Array.isArray(trace.steps)) ? trace.steps : [];
+    if (!steps.length) return '';
+    const sym = {add: '+', sub: '-', mul: '×', div: '÷'};
+    const vmap = {};
+    const rows = steps.map((s, i) => {
+        const op = s.op || 'const';
+        const resolve = (a) => {
+            if (typeof a === 'number') return a;
+            if (typeof a === 'string' && a in vmap) return vmap[a];
+            const f = parseFloat(a);
+            return isNaN(f) ? a : f;
+        };
+        const v1 = resolve(s.arg1), v2 = resolve(s.arg2);
+        let rv;
+        if (op === 'add')      rv = v1 + v2;
+        else if (op === 'sub') rv = v1 - v2;
+        else if (op === 'mul') rv = v1 * v2;
+        else if (op === 'div' && v2 !== 0) rv = v1 / v2;
+        else rv = v1;
+        if (s.result) vmap[s.result] = rv;
+        const opSym = sym[op] || op;
+        const expr = (op === 'const' || op === 'final_answer')
+            ? `${s.result || ''} = ${v1}`
+            : `${s.result || `v${i+1}`} = ${v1} ${opSym} ${v2}`;
+        return `<div class="tp-trace-row">
+            <span class="label">Step ${i + 1}</span>
+            <span class="expr">${escapeHtml(expr)}</span>
+            <span class="val">${typeof rv === 'number' ? Math.round(rv * 100) / 100 : escapeHtml(String(rv))}</span>
+        </div>`;
+    }).join('');
+    return `<div class="tp-trace">${rows}</div>`;
+}
+
+function findPredictionFor(valIndex) {
+    if (!DATA || !Array.isArray(DATA.samples)) return null;
+    return DATA.samples.find(p => p.sample_id === valIndex) || null;
+}
+
+function renderHLPanel(pred) {
+    if (!pred || !Array.isArray(pred.h_states) || !Array.isArray(pred.l_states)
+        || (pred.h_states.length === 0 && pred.l_states.length === 0)) {
+        return `<div style="padding:12px;color:var(--text-muted);font-size:0.85rem;background:var(--bg-card-hover);border-radius:8px">
+            Per-cycle H/L norms unavailable for this sample.
+        </div>`;
+    }
+    const maxH = Math.max(...pred.h_states.map(x => x.norm), 0.01);
+    const maxL = Math.max(...pred.l_states.map(x => x.norm), 0.01);
+    const hBars = pred.h_states.map(h => `
+        <div class="state-bar-container">
+            <div class="state-label">H-cycle ${h.h_cycle + 1} of 3 — mean |z_H| = ${h.norm}</div>
+            <div class="state-bar h-bar" style="width:${(h.norm/maxH*100).toFixed(0)}%"></div>
+        </div>`).join('');
+    const lBars = pred.l_states.map(l => `
+        <div class="state-bar-container">
+            <div class="state-label">H${l.h_cycle + 1}·L${l.l_cycle + 1} — mean |z_L| = ${l.norm}</div>
+            <div class="state-bar l-bar" style="width:${(l.norm/maxL*100).toFixed(0)}%"></div>
+        </div>`).join('');
+    return `<div class="states-grid">
+        <div class="state-col"><h4>🔵 H-Level (Planner) · ${pred.h_states.length} cycles</h4>${hBars}</div>
+        <div class="state-col"><h4>🟢 L-Level (Executor) · ${pred.l_states.length} updates</h4>${lBars}</div>
+    </div>`;
+}
+
+function renderACTPanel(pred) {
+    if (!pred) return '<div style="color:var(--text-muted);font-size:0.85rem">ACT data unavailable.</div>';
+    const halt = pred.q_halt;
+    const cont = pred.q_continue;
+    const decision = halt > cont ? 'HALT' : 'CONTINUE';
+    const decisionColor = halt > cont ? 'var(--green)' : 'var(--accent)';
+    const halt_step = pred.halt_step ?? '?';
+    return `<div class="act-info">
+        <div>Q(halt): <span class="act-val" style="color:var(--red)">${halt}</span></div>
+        <div>Q(continue): <span class="act-val" style="color:var(--green)">${cont}</span></div>
+        <div style="color:var(--text-muted)">Decision: <span style="color:${decisionColor};font-weight:600">${decision}</span></div>
+        <div style="color:var(--text-muted)">Halt step: <span style="color:var(--purple);font-weight:600">${halt_step} / 4</span></div>
+    </div>`;
+}
+
+function renderGraphPanel(pred) {
+    if (!pred || !pred.graph || !Array.isArray(pred.graph.nodes)) return '';
+    const nodes = pred.graph.nodes.map(n => {
+        const cls = n.correct ? 'node-correct' : 'node-wrong';
+        return `<div class="graph-node ${cls}">
+            <div class="node-op">${escapeHtml(n.op)}</div>
+            <div class="node-vals">args: [${n.arg1_norm}, ${n.arg2_norm}]</div>
+            <div class="node-pred">
+                <span style="color:${n.correct ? 'var(--green)' : 'var(--red)'}">HRM: ${n.predicted}</span>
+                <span style="color:var(--text-muted)"> / true ${n.target}</span>
+            </div>
+        </div>`;
+    }).join('');
+    return `<div class="graph-container">${nodes}</div>`;
+}
+
+function selectV32Sample(idx) {
+    currentSample = idx;
+    document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${idx}`)?.classList.add('active');
+    const s = TRAINING_STATS.explanation_samples[idx];
+    const pred = findPredictionFor(s.i);    // join to real model outputs (H/L, ACT, graph)
+    const correct = s.true === s.hrm_pred;
+    const cls = correct ? 'result-correct' : 'result-wrong';
+    const icon = correct ? '✅' : '❌';
+    const coh = s.coherence ?? '–';
+    const traceHTML = renderSymbolicTrace(s.trace);
+    const truncWarn = s.explanation_truncated
+        ? `<div class="tp-warn">⚠ Explanation cut off by LLM token cap. Re-run with <code>max_tokens=2048</code> to capture the full reasoning.</div>`
+        : '';
+
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `
+        ${renderTrainingPanel()}
+        <div class="pipeline">
+            <div class="pipeline-step step-5">
+                <div class="step-header">
+                    <div class="step-num">★</div>
+                    <div>
+                        <div class="step-title">Sample #${idx + 1} ${icon}</div>
+                        <div class="step-subtitle">Interpretability sample · coherence ${coh}/5</div>
+                    </div>
+                </div>
+                <div class="step-body">
+                    <div class="result-card ${cls}">
+                        <div>
+                            <div class="result-label">True Answer</div>
+                            <div class="result-number" style="color:var(--text-primary)">${s.true}</div>
+                        </div>
+                        <div class="result-arrow">→</div>
+                        <div>
+                            <div class="result-label">HRM Predicted</div>
+                            <div class="result-number">${s.hrm_pred}</div>
+                        </div>
+                        <div class="result-arrow">·</div>
+                        <div>
+                            <div class="result-label">Coherence</div>
+                            <div class="result-number">
+                                <span class="tp-coh-pill tp-coh-${coh}" style="font-size:1.5rem;padding:6px 14px">${coh}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pipeline-arrow">▼</div>
+
+            <div class="pipeline-step step-1">
+                <div class="step-header">
+                    <div class="step-num">Q</div>
+                    <div>
+                        <div class="step-title">Original Word Problem</div>
+                        <div class="step-subtitle">GSM8K validation set (full text)</div>
+                    </div>
+                </div>
+                <div class="step-body">
+                    <div style="line-height:1.6;color:var(--text-primary);font-size:0.95rem;white-space:pre-wrap">${escapeHtml(s.question)}</div>
+                </div>
+            </div>
+
+            <div class="pipeline-arrow">▼</div>
+
+            <div class="pipeline-step step-2">
+                <div class="step-header">
+                    <div class="step-num">📐</div>
+                    <div>
+                        <div class="step-title">Symbolic Reasoning Trace</div>
+                        <div class="step-subtitle">Parsed by Qwen 3.5 (frozen) · this is the program HRM was trained to execute</div>
+                    </div>
+                </div>
+                <div class="step-body">${traceHTML || '<div style="color:var(--text-muted);font-size:0.85rem">No trace recovered.</div>'}</div>
+            </div>
+
+            <div class="pipeline-arrow">▼</div>
+
+            <div class="pipeline-step step-4">
+                <div class="step-header">
+                    <div class="step-num">💬</div>
+                    <div>
+                        <div class="step-title">Grounded Explanation</div>
+                        <div class="step-subtitle">
+                            Generated by <strong>Qwen 3.5</strong> conditioned on <strong>HRM's per-step decoded latents</strong> ·
+                            graded ${coh}/5 by a separate LLM-as-judge call
+                        </div>
+                    </div>
+                </div>
+                <div class="step-body">
+                    <div class="live-explanation" style="white-space:pre-wrap;line-height:1.65">${escapeHtml(s.explanation)}</div>
+                    ${truncWarn}
+                </div>
+            </div>
+
+            <div class="pipeline-arrow">▼</div>
+
+            <div class="pipeline-step step-1">
+                <div class="step-header">
+                    <div class="step-num">📊</div>
+                    <div>
+                        <div class="step-title">HRM Per-Step Decoded Values</div>
+                        <div class="step-subtitle">Each node's <code>z_H</code> latent decoded through the same digit head as the final answer</div>
+                    </div>
+                </div>
+                <div class="step-body">${renderGraphPanel(pred) || '<div style="color:var(--text-muted);font-size:0.85rem">No per-node data exported for this sample (i=' + s.i + '). Re-run <code>export_predictions_v32.py</code> with <code>--max</code> covering this index.</div>'}</div>
+            </div>
+
+            <div class="pipeline-arrow">▼</div>
+
+            <div class="pipeline-step step-3">
+                <div class="step-header">
+                    <div class="step-num">3</div>
+                    <div>
+                        <div class="step-title">H/L Reasoning Cycles</div>
+                        <div class="step-subtitle">Hcycles=3 outer × Lcycles=4 inner · 1-step gradient approximation · norms from real model forward</div>
+                    </div>
+                </div>
+                <div class="step-body">${renderHLPanel(pred)}</div>
+            </div>
+
+            <div class="pipeline-arrow">▼</div>
+
+            <div class="pipeline-step step-2">
+                <div class="step-header">
+                    <div class="step-num">4</div>
+                    <div>
+                        <div class="step-title">ACT (Adaptive Computation Time)</div>
+                        <div class="step-subtitle">Q-head halt/continue decision · captured from this sample's final ACT segment</div>
+                    </div>
+                </div>
+                <div class="step-body">${renderACTPanel(pred)}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderPipeline(s) {
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `
+        ${renderTrainingPanel()}
+        <div class="pipeline">
+            ${renderResult(s)}
+            <div class="pipeline-arrow">▼</div>
+            ${renderGraphStep(s)}
+            <div class="pipeline-arrow">▼</div>
+            ${renderBridgeStep(s)}
+            <div class="pipeline-arrow">▼</div>
+            ${renderHLStep(s)}
+            <div class="pipeline-arrow">▼</div>
+            ${renderDigitStep(s)}
+            <div class="pipeline-arrow">▼</div>
+            ${renderACTStep(s)}
+        </div>
+    `;
+}
+
+function renderResult(s) {
+    const cls = s.correct ? 'result-correct' : 'result-wrong';
+    const icon = s.correct ? '✅' : (s.near_match ? '🔶' : '❌');
+    const sampleId = (s.sample_id != null) ? (s.sample_id + 1) : (currentSample + 1);
+    const trueAnswer = (s.true_answer != null) ? s.true_answer : s.computed_answer;
+    const trueDigits = Array.isArray(s.true_digits) ? s.true_digits : [];
+    const predDigits = Array.isArray(s.pred_digits) ? s.pred_digits : [];
+    return `
+    <div class="pipeline-step step-5">
+        <div class="step-header">
+            <div class="step-num">★</div>
+            <div><div class="step-title">Final Result ${icon}</div>
+            <div class="step-subtitle">Sample #${sampleId} • ${s.num_nodes} reasoning nodes</div></div>
+        </div>
+        <div class="step-body">
+            <div class="result-card ${cls}">
+                <div>
+                    <div class="result-label">True Answer</div>
+                    <div class="result-number" style="color:var(--text-primary)">${trueAnswer}</div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);font-family:'JetBrains Mono'">[${trueDigits.filter(d=>d!='PAD').join(', ')}]</div>
+                </div>
+                <div class="result-arrow">→</div>
+                <div>
+                    <div class="result-label">Predicted</div>
+                    <div class="result-number">${s.predicted_answer}</div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);font-family:'JetBrains Mono'">[${predDigits.filter(d=>d!='PAD').join(', ')}]</div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderGraphStep(s) {
+    const nodes = s.graph.nodes.map(n => {
+        const cls = n.correct ? 'node-correct' : 'node-wrong';
+        return `<div class="graph-node ${cls}">
+            <div class="node-op">${n.op}</div>
+            <div class="node-vals">args: [${n.arg1_norm}, ${n.arg2_norm}]</div>
+            <div class="node-pred">
+                <span style="color:${n.correct ? 'var(--green)' : 'var(--red)'}">${n.predicted}</span>
+                <span style="color:var(--text-muted)"> / ${n.target}</span>
+            </div>
+        </div>`;
+    }).join('');
+    
+    return `
+    <div class="pipeline-step step-1">
+        <div class="step-header">
+            <div class="step-num">1</div>
+            <div><div class="step-title">Input: Computation Graph</div>
+            <div class="step-subtitle">Parsed reasoning trace • ${s.graph.nodes.length} nodes, ${s.graph.edges.length} edges</div></div>
+        </div>
+        <div class="step-body">
+            <div class="graph-container">${nodes}</div>
+        </div>
+    </div>`;
+}
+
+function renderBridgeStep(s) {
+    const bars = s.graph.nodes.map(n => {
+        const maxNorm = Math.max(...s.graph.nodes.map(x => x.embedding_norm));
+        const pct = (n.embedding_norm / maxNorm * 100).toFixed(0);
+        return `<div class="state-bar-container">
+            <div class="state-label">Node ${n.id} (${n.op}) — norm: ${n.embedding_norm}</div>
+            <div class="state-bar h-bar" style="width:${pct}%"></div>
+        </div>`;
+    }).join('');
+    
+    return `
+    <div class="pipeline-step step-2">
+        <div class="step-header">
+            <div class="step-num">2</div>
+            <div><div class="step-title">GAT Bridge Output</div>
+            <div class="step-subtitle">Graph Attention Network • 3 layers, 4 heads • Embedding norms per node</div></div>
+        </div>
+        <div class="step-body">${bars}</div>
+    </div>`;
+}
+
+function renderHLStep(s) {
+    const hStates = Array.isArray(s.h_states) ? s.h_states : [];
+    const lStates = Array.isArray(s.l_states) ? s.l_states : [];
+
+    if (hStates.length === 0 && lStates.length === 0) {
+        return `
+        <div class="pipeline-step step-3">
+            <div class="step-header">
+                <div class="step-num">3</div>
+                <div><div class="step-title">H/L Reasoning Cycles</div>
+                <div class="step-subtitle">Hcycles=3 × Lcycles=4 • 1-step gradient approximation</div></div>
+            </div>
+            <div class="step-body">
+                <div style="padding:12px;color:var(--text-muted);font-size:0.85rem;background:var(--bg-card-hover);border-radius:8px">
+                    Per-cycle H/L state norms not present in this <code>predictions.json</code>.
+                    Re-run <code style="color:var(--cyan)">python src/export_predictions.py</code>
+                    against the current best checkpoint to populate them.
+                </div>
+            </div>
+        </div>`;
+    }
+
+    const maxH = Math.max(...hStates.map(x => x.norm), 0.01);
+    const maxL = Math.max(...lStates.map(x => x.norm), 0.01);
+
+    const hBars = hStates.map(h => `
+        <div class="state-bar-container">
+            <div class="state-label">H-cycle ${h.h_cycle} — norm: ${h.norm}</div>
+            <div class="state-bar h-bar" style="width:${(h.norm/maxH*100).toFixed(0)}%"></div>
+        </div>
+    `).join('');
+
+    const lBars = lStates.map(l => `
+        <div class="state-bar-container">
+            <div class="state-label">H${l.h_cycle}·L${l.l_cycle} — norm: ${l.norm}</div>
+            <div class="state-bar l-bar" style="width:${(l.norm/maxL*100).toFixed(0)}%"></div>
+        </div>
+    `).join('');
+
+    return `
+    <div class="pipeline-step step-3">
+        <div class="step-header">
+            <div class="step-num">3</div>
+            <div><div class="step-title">H/L Reasoning Cycles</div>
+            <div class="step-subtitle">Hcycles=3 × Lcycles=4 • 1-step gradient approximation • Bidirectional attention</div></div>
+        </div>
+        <div class="step-body">
+            <div class="states-grid">
+                <div class="state-col"><h4>🔵 H-Level (Planner)</h4>${hBars}</div>
+                <div class="state-col"><h4>🟢 L-Level (Executor)</h4>${lBars}</div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderDigitStep(s) {
+    const trueDigits = Array.isArray(s.true_digits) ? s.true_digits : [];
+    const cards = (s.digit_probs || []).map((dp, i) => {
+        const trueDigit = trueDigits[i];   // may be undefined if not exported
+        const isCorrect = trueDigit != null && dp.predicted === trueDigit;
+        const isPad = trueDigit === 'PAD';
+        if (isPad && dp.predicted === 'PAD') return '';
+        
+        const cls = isPad ? '' : (isCorrect ? 'digit-correct' : 'digit-wrong');
+        const color = isPad ? 'var(--text-muted)' : (isCorrect ? 'var(--green)' : 'var(--red)');
+        
+        // Top 5 probabilities
+        const sorted = Object.entries(dp.distribution)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+        
+        const bars = sorted.map(([label, prob]) => {
+            const isTarget = label === trueDigit;
+            const barColor = isTarget ? 'var(--green)' : 'var(--accent)';
+            return `<div class="prob-bar-wrap">
+                <div class="prob-label" style="${isTarget ? 'color:var(--green);font-weight:700' : ''}">${label}</div>
+                <div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${(prob*100).toFixed(0)}%;background:${barColor}"></div></div>
+                <div class="prob-val">${(prob*100).toFixed(1)}%</div>
+            </div>`;
+        }).join('');
+        
+        return `<div class="digit-card ${cls}">
+            <div class="digit-pos">Position ${i} ${isPad ? '(pad)' : ''}</div>
+            <div class="digit-pred" style="color:${color}">${dp.predicted}</div>
+            ${bars}
+        </div>`;
+    }).filter(Boolean).join('');
+    
+    return `
+    <div class="pipeline-step step-4">
+        <div class="step-header">
+            <div class="step-num">4</div>
+            <div><div class="step-title">Digit Classification Head</div>
+            <div class="step-subtitle">8 positions × 13 vocab • Per-digit probability distributions</div></div>
+        </div>
+        <div class="step-body">
+            <div class="digit-grid">${cards}</div>
+        </div>
+    </div>`;
+}
+
+function renderACTStep(s) {
+    return `
+    <div class="pipeline-step step-2">
+        <div class="step-header">
+            <div class="step-num">5</div>
+            <div><div class="step-title">ACT (Adaptive Computation Time)</div>
+            <div class="step-subtitle">Q-values for halt/continue decision</div></div>
+        </div>
+        <div class="step-body">
+            <div class="act-info">
+                <div>Q(halt): <span class="act-val" style="color:var(--red)">${s.q_halt}</span></div>
+                <div>Q(continue): <span class="act-val" style="color:var(--green)">${s.q_continue}</span></div>
+                <div style="color:var(--text-muted)">Decision: <span style="color:var(--cyan);font-weight:600">${s.q_halt > s.q_continue ? 'HALT' : 'CONTINUE'}</span></div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// Live inference — uses serve_v32.py's /api/predict
+async function runLiveInference() {
+    const question = document.getElementById('liveInput').value.trim();
+    if (!question) return;
+    const btn = document.getElementById('liveBtn');
+    const status = document.getElementById('liveStatus');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running HRM...';
+    status.textContent = 'Parsing with LLM, then running HRM...';
+    const main = document.getElementById('mainContent');
+    main.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Running live inference...</div>';
+    // Try to parse any user-supplied trace JSON inside the question box.
+    // If the textbox contains a JSON object with a "trace" key, pass it as a
+    // pre-parsed trace and bypass the LLM parser entirely (HRM runs in ~0.1s).
+    let body = {question};
+    try {
+        const maybe = JSON.parse(question);
+        if (maybe && maybe.trace && Array.isArray(maybe.trace.steps)) {
+            body = {question: maybe.question || '(supplied trace)', trace: maybe.trace};
+        }
+    } catch (_) { /* not JSON — fine */ }
+    try {
+        const resp = await fetch('/api/predict', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        // Distinguish three failure modes:
+        //   (A) No backend at all — `python -m http.server` returns an HTML 404
+        //       page on POST. Content-Type is text/html, not application/json.
+        //   (B) Backend up but returned a JSON error (e.g. parser_error 503).
+        //       We let the normal result.error branch handle that, which shows
+        //       actionable bypass instructions.
+        //   (C) Network error / fetch threw — caught by outer try/catch.
+        const ct = resp.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            status.innerHTML = '';
+            main.innerHTML = `
+                <div class="training-panel" style="border-color:var(--yellow)">
+                    <h2>⚠ Live inference backend not running</h2>
+                    <div class="tp-sub">
+                        Got a non-JSON response (likely from <code>python -m http.server</code>, which only serves static files).
+                        Live inference needs <code>serve_v32.py</code> running on port 8765.
+                    </div>
+                    <div class="tp-section-title">To enable live inference</div>
+                    <pre style="background:var(--bg-card-hover);padding:12px;border-radius:6px;font-size:0.8rem;overflow-x:auto;color:var(--text-secondary)">
+# 1. Kill whatever's on port 8765:
+lsof -ti :8765 | xargs kill
+
+# 2. Start the v3.2 inference server in its place:
+python serve_v32.py
+
+# 3. Re-open http://localhost:8765/</pre>
+                </div>`;
+            return;
+        }
+        const result = await resp.json();
+        if (result.error) {
+            // Common case: LLM parser unreachable. Show actionable guidance.
+            const parserDown = (result.error || '').toLowerCase().includes('unavailable')
+                            || (result.error || '').toLowerCase().includes('timed out');
+            main.innerHTML = `
+                <div class="training-panel" style="border-color:var(--yellow)">
+                    <h2>⚠ Live inference: ${parserDown ? 'LLM parser unreachable' : 'request rejected'}</h2>
+                    <div class="tp-sub">${escapeHtml(result.error)}</div>
+                    ${parserDown ? `
+                    <div class="tp-section-title">Bypass: paste a pre-parsed trace</div>
+                    <div style="color:var(--text-muted);font-size:0.85rem;line-height:1.55;margin-bottom:8px">
+                        While the upstream LLM parser is down, you can still run HRM by pasting a
+                        JSON object with a <code>trace</code> field into the question box, like this:
+                    </div>
+                    <pre style="background:var(--bg-card-hover);padding:12px;border-radius:6px;font-size:0.78rem;overflow-x:auto;color:var(--text-secondary);line-height:1.45">
+{
+  "question": "Natalia sold clips to 48 friends in April. In May she sold half as many. How many in total?",
+  "trace": {
+    "steps": [
+      {"op": "div", "arg1": 48, "arg2": 2, "result": "v1"},
+      {"op": "add", "arg1": 48, "arg2": "v1", "result": "v2"}
+    ],
+    "final_answer": "v2"
+  }
+}</pre>
+                    <div style="color:var(--text-muted);font-size:0.8rem;margin-top:8px">
+                        Paste that into the Live Inference box and click <strong>Run HRM Pipeline</strong>.
+                        HRM will return in ~0.1s with full per-step decoded values, H/L cycles, and ACT decision.
+                    </div>` : ''}
+                </div>`;
+            status.textContent = '⚠ ' + (parserDown ? 'Parser unreachable — see panel.' : 'Request rejected.');
+            return;
+        }
+        status.textContent = '✅ HRM ran in ' + (result.elapsed_sec || 0) + 's';
+
+        // Build the same view a cached v3.2 sample uses, so live results are visually consistent.
+        const correct = result.correct;
+        const cls = correct ? 'result-correct' : 'result-wrong';
+        const icon = correct ? '✅' : (result.near_match ? '🔶' : '❌');
+        const symbolicTraceHTML = renderSymbolicTrace(result.trace);
+
+        let explHTML = '';
+        if (result.explanation) {
+            explHTML = `
+                <div class="pipeline-arrow">▼</div>
+                <div class="pipeline-step step-4">
+                    <div class="step-header">
+                        <div class="step-num">💬</div>
+                        <div>
+                            <div class="step-title">Grounded Explanation (live)</div>
+                            <div class="step-subtitle">Generated by Qwen 3.5 conditioned on HRM's per-step decodings</div>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <div class="live-explanation" style="white-space:pre-wrap;line-height:1.65">${escapeHtml(result.explanation)}</div>
+                    </div>
+                </div>`;
+        } else if (result.explainer_error) {
+            explHTML = `
+                <div class="pipeline-arrow">▼</div>
+                <div class="pipeline-step step-4">
+                    <div class="step-header">
+                        <div class="step-num">💬</div>
+                        <div>
+                            <div class="step-title">Grounded Explanation</div>
+                            <div class="step-subtitle">Skipped or unavailable</div>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <div style="color:var(--text-muted);font-size:0.85rem">
+                            ${escapeHtml(result.explainer_error)}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        const halt_step = result.halt_step ?? '?';
+
+        main.innerHTML = `
+            <div style="margin-bottom:12px;padding:12px 16px;background:var(--accent-glow);border:1px solid var(--accent);border-radius:8px;font-size:0.9rem">
+                <strong>Live Inference</strong> · HRM ran in ${result.elapsed_sec || 0}s · halt at ACT segment ${halt_step}/4
+            </div>
+            <div class="pipeline">
+                <div class="pipeline-step step-5">
+                    <div class="step-header">
+                        <div class="step-num">★</div>
+                        <div>
+                            <div class="step-title">Live Result ${icon}</div>
+                            <div class="step-subtitle">${result.num_nodes} reasoning nodes</div>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <div class="result-card ${cls}">
+                            <div>
+                                <div class="result-label">Symbolic Answer</div>
+                                <div class="result-number" style="color:var(--text-primary)">${result.computed_answer}</div>
+                            </div>
+                            <div class="result-arrow">→</div>
+                            <div>
+                                <div class="result-label">HRM Predicted</div>
+                                <div class="result-number">${result.predicted_answer}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pipeline-arrow">▼</div>
+
+                <div class="pipeline-step step-1">
+                    <div class="step-header">
+                        <div class="step-num">Q</div>
+                        <div>
+                            <div class="step-title">Question</div>
+                        </div>
+                    </div>
+                    <div class="step-body">
+                        <div style="line-height:1.55;color:var(--text-primary);font-size:0.95rem;white-space:pre-wrap">${escapeHtml(result.question || question)}</div>
+                    </div>
+                </div>
+
+                <div class="pipeline-arrow">▼</div>
+
+                <div class="pipeline-step step-2">
+                    <div class="step-header">
+                        <div class="step-num">📐</div>
+                        <div>
+                            <div class="step-title">Symbolic Trace</div>
+                            <div class="step-subtitle">${result.parser_error ? 'Pre-supplied by user (LLM parser bypassed)' : 'Parsed by Qwen 3.5'}</div>
+                        </div>
+                    </div>
+                    <div class="step-body">${symbolicTraceHTML}</div>
+                </div>
+
+                <div class="pipeline-arrow">▼</div>
+
+                <div class="pipeline-step step-1">
+                    <div class="step-header">
+                        <div class="step-num">📊</div>
+                        <div>
+                            <div class="step-title">HRM Per-Step Decoded Values</div>
+                            <div class="step-subtitle">Each graph node's z_H latent decoded</div>
+                        </div>
+                    </div>
+                    <div class="step-body">${renderGraphPanel(result)}</div>
+                </div>
+
+                <div class="pipeline-arrow">▼</div>
+
+                <div class="pipeline-step step-3">
+                    <div class="step-header">
+                        <div class="step-num">3</div>
+                        <div>
+                            <div class="step-title">H/L Reasoning Cycles</div>
+                            <div class="step-subtitle">Hcycles=3 × Lcycles=4 · norms from this run</div>
+                        </div>
+                    </div>
+                    <div class="step-body">${renderHLPanel(result)}</div>
+                </div>
+
+                <div class="pipeline-arrow">▼</div>
+
+                <div class="pipeline-step step-2">
+                    <div class="step-header">
+                        <div class="step-num">4</div>
+                        <div>
+                            <div class="step-title">ACT (Adaptive Computation Time)</div>
+                            <div class="step-subtitle">Halt decision from this run</div>
+                        </div>
+                    </div>
+                    <div class="step-body">${renderACTPanel(result)}</div>
+                </div>
+
+                ${explHTML}
+            </div>`;
+        document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+    } catch(e) {
+        status.textContent = '❌ Error: ' + e.message;
+        main.innerHTML = `<div class="training-panel" style="border-color:var(--red)">
+            <h2>❌ Live inference failed</h2>
+            <div class="tp-sub">${escapeHtml(e.message || String(e))}</div>
+        </div>`;
+    }
+    finally { btn.disabled = false; btn.textContent = '⚡ Run HRM Pipeline'; }
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+    if (!DATA) return;
+    if (document.activeElement.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        selectSample(Math.min(currentSample + 1, DATA.samples.length - 1));
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        selectSample(Math.max(currentSample - 1, 0));
+    }
+});
+
+loadData();
+</script>
+</body>
+</html>

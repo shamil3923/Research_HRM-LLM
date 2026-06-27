@@ -1,0 +1,66 @@
+
+# ─── Model ────────────────────────────────────────────────────────────────────
+model:
+  d_model: 256            # Hidden dimension
+  n_heads: 8              # Attention heads
+  H_cycles: 2             # High-level reasoning iterations
+  L_cycles: 4             # Low-level reasoning iterations per H-cycle
+  H_layers: 4             # Transformer blocks in H-level (planner)
+  L_layers: 4             # Transformer blocks in L-level (executor)
+  seq_len: 50             # Max graph nodes
+  vocab_size: 9           # OP_VOCAB size
+
+  # GAT Bridge
+  gat_hidden: 128
+  gat_layers: 3
+  gat_heads: 4
+  num_value_features: 2   # [arg1_log1p, arg2_log1p]
+
+  # Digit Classification Head
+  max_digits: 8           # Max digits per number (covers up to 99,999,999)
+  digit_vocab: 13         # {PAD, 0-9, NEG, EOS}
+
+# ─── Dataset ──────────────────────────────────────────────────────────────────
+data:
+  train_file: "data/gsm8k_train_parsed.json"
+  max_nodes: 50
+  curriculum:
+    phase0_max_steps: 2
+    phase1_max_steps: 5
+
+# ─── Training ─────────────────────────────────────────────────────────────────
+training:
+  epochs: 120
+  batch_size: 32
+
+  optimizer:
+    peak_lr: 3.0e-4
+    betas: [0.9, 0.95]
+    schedule: "flat"
+    warmup_steps: 30
+    max_grad_norm: 0.5
+
+  loss:
+    type: "cross_entropy"     # Digit-level cross-entropy (was: huber)
+    node_weight_early: 0.7    # Weight on all-node CE in phases 0-1
+    final_weight_early: 0.3   # Weight on final-answer CE in phases 0-1
+    node_weight_late: 0.4     # Weight on all-node CE in phase 2
+    final_weight_late: 0.6    # Weight on final-answer CE in phase 2
+
+  eval_every: 5
+  verbose_every: 40
+
+# ─── RL Fine-tuning (Phase 3) ────────────────────────────────────────────────
+rl:
+  enabled: false
+  rl_epochs: 50
+  rl_lr: 1.0e-5
+  rl_batch_size: 64
+  ce_regularization: 0.1     # Blend CE loss to prevent mode collapse
+  baseline_momentum: 0.99
+  reward_type: "dense"        # "binary" or "dense" (per-digit rewards)
+
+# ─── Checkpoint ───────────────────────────────────────────────────────────────
+checkpoint:
+  save_dir: "checkpoints/gsm8k"
+  save_best: true

@@ -1,0 +1,46 @@
+# HRM Training Configuration for Sudoku-Extreme
+# Modified parameters - trying 8-GPU learning rate scaled for single GPU stability
+
+# Core hyperparameters (restored to README values with corrected data format)
+learning_rate: 0.00007  # lr=7e-5 from README 
+embedding_lr: 0.00007   # puzzle_emb_lr=7e-5 from README
+weight_decay: 1.0       # weight_decay=1.0 from README (original value)
+embedding_weight_decay: 1.0  # puzzle_emb_weight_decay=1.0 from README
+batch_size: 64          # Micro-batch size for gradient accumulation
+gradient_accumulation_steps: 6  # 64 * 6 = 384 effective batch size
+max_epochs: 20000       # epochs=20000 from README
+
+# Learning rate scheduling
+warmup_steps: 2000
+min_lr_ratio: 0.1
+
+# AdamATan2 parameters (exact match to original)
+beta1: 0.9
+beta2: 0.95
+
+# Model architecture (original HRM configuration)
+d_model: 512
+H_cycles: 2
+L_cycles: 2
+H_layers: 4
+L_layers: 4
+expansion: 2.0
+
+# ACT and Q-learning (original parameters)
+halt_max_steps: 8   # Optimized for Sudoku (original uses 16)
+halt_exploration_prob: 0.1
+
+# Sudoku-specific data configuration
+train_samples: 1000
+val_samples: 200
+min_difficulty: 20
+data_path: "data"
+
+# Training settings (from README)
+eval_interval: 2000     # eval_interval=2000 from README
+save_every: 2000
+checkpoint_dir: "checkpoints"
+
+# Monitoring
+project_name: "hrm-sudoku"
+run_name: "sudoku-extreme-training"
